@@ -1,0 +1,118 @@
+---
+title: "PML-project"
+output: html_document
+---
+Objective: Predicting the manner in which an individual did the exercise. Create a report describing how the model was built using cross validation, what the error was and why a particular choice was made. And finally use the cross-validate model to do the prediction for 20 test cases.
+
+Datasets: WLE Data Set consisting of 159 columns, one being the predicting variable 
+
+The whole process can be divided in 3 major categories: Preprocessing and Data exploration, Model Building, Prediction
+
+Preprocessing and Data exploration
+
+Selection of Independent variables
+
+By reading through description of datasets and looking through the summary(traindata)  
+
+```{r}
+library(caret)
+library(randomForest)
+library(tree)
+library(gbm)
+setwd ("C:\\pml\\")
+traindata = read.csv("pml-training.csv", header = TRUE, sep = ",")
+testdata = read.csv("pml-testing.csv",header = TRUE, sep = ",")
+```
+it appears that the predictor variables should be following as all other variables are just either description or min, max, skewness, kurtosis, average, gyros, etc.
+
+roll_belt  pitch_belt	yaw_belt	total_accel_belt
+roll_arm	pitch_arm	yaw_arm	total_accel_arm
+roll_dumbbell	pitch_dumbbell	   yaw_dumbbell
+roll_forearm	pitch_forearm	yaw_forearm
+
+So based on above understanding, we have 14 independent variable and a dependent variable (classe). Also looking through the dependent variable, it is sure that is a case of multi-class classification problem
+
+
+All the independent variables are continuous (numerical) and only the dependent variable is 
+
+```{r}
+list = cbind(8,9,10,11,46,47,48,49,84,85,86,122,123,124,160)  ## the 14 independent variable and one dependent variable
+traindata = traindata[,list]
+testdata = testdata[,list]
+traindata$classe = as.factor(traindata$classe)
+set.seed(1234)
+traincor = traindata[,-15]
+```
+
+Exploration of variables
+
+```{r, echo=FALSE}
+cor(traincor)
+```
+testdata is actually data where we are supposed to do the prediction
+
+So, we will make use of traindata to create training and test set for creating the model: train1 and test1
+
+```{r}
+set.seed(1234)
+trainIndex = sample(1:dim(traindata)[1],size=dim(traindata)[1]/2,replace=F)
+train1 = traindata[trainIndex,]
+test1 = traindata[-trainIndex,]
+```
+
+
+Modeling and Prediction
+
+So having known that is a case of multi-class classification, it makes sense to use classifiers like random forest, logistic regression and gradient boost method
+
+1. Decision Tree
+
+```{r}
+Modtree = train(classe ~ . , data =train1, method ="rpart")
+predicttesttree = predict(Modtree, test1)
+```
+Out of sample error based on decision tree
+
+```{r, echo=FALSE}
+table(predicttesttree,test1$classe)  
+```
+The confusion matrix based on decision tree is not good enough and already shows a lot of missclassification
+
+So, we try another algorithm 
+
+2. Random Forest
+
+```{r}
+ModRF = randomForest(classe ~ .,train1, ntree = 50, norm.votes = FALSE, importance = TRUE)
+predicttestRF = predict(ModRF,test1)
+```
+In sample error based on random forest
+
+```{r, echo=FALSE}
+ModRF$confusion
+```
+Confusion matrix is very good
+
+Out of sample error
+
+```{r, echo=FALSE}
+table(predicttestRF, test1$classe)
+```
+
+An insight into variable importance does tell which predictors are more important
+
+```{r, echo=FALSE}
+importance(ModRF)
+```
+
+Prediction on the testdata
+
+```{r}
+predicttestdata = predict(ModRF, testdata)
+```
+
+```{r, echo=FALSE}
+table(testdata$problem_id, predicttestdata)
+```
+
+The random forest performs perfectly and has all the prediction based on the submission
